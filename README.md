@@ -19,7 +19,7 @@
 
 1.  **克隆仓库**
     ```bash
-    git clone <https://github.com/obkj/github-releases-manager>
+    git clone https://github.com/obkj/github-releases-manager
     cd github-releases-manager
     ```
 
