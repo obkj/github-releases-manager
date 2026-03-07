@@ -1,5 +1,9 @@
 # GitHub Release Manager
 
+![应用截图](5251.png)
+
+---
+
 一个使用 Python 和 Tkinter (ttkbootstrap) 构建的图形化 GitHub Release 管理工具，支持浏览和批量删除 Releases。
 
 ## ✨ 功能特性
