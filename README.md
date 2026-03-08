@@ -56,3 +56,7 @@ python main.py
 3.  从下拉列表中选择一个仓库，下方的表格将自动加载该仓库的所有 Releases。
 4.  点击表格第一列 "Select" 下的方框来勾选需要删除的 Releases。
 5.  点击左下角的 "Delete Selected Releases" 按钮，在弹出的确认框中确认后即可删除。
+
+## 📄 开源协议
+
+本项目遵循 [MIT License](LICENSE) 开源协议。
