@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 import requests
 import threading
 from ttkbootstrap import Style
+from typing import Any, List, Dict, Optional
 
 class GitHubReleaseManager(tk.Tk):
     """
@@ -19,6 +20,11 @@ class GitHubReleaseManager(tk.Tk):
         self.selected_repo = tk.StringVar()
         self.repos = []
         self.releases = []
+
+        # Initialize attributes for type checking (using Any to simplify external dependency issues in Pyre2)
+        self.repo_selector: Any = None
+        self.tree: Any = None
+        self.status_label: Any = None
 
         self._create_widgets()
 
@@ -113,12 +119,12 @@ class GitHubReleaseManager(tk.Tk):
                 self.repos.extend([repo['full_name'] for repo in data])
                 page += 1
             
-            self.after(0, self._update_repo_selector)
-            self.after(0, self.update_status, f"Loaded {len(self.repos)} repositories.")
+            self.after(0, lambda *_: self._update_repo_selector())
+            self.after(0, lambda *_: self.update_status(f"Loaded {len(self.repos)} repositories."))
         except requests.RequestException as e:
             error_message = f"Error loading repos: {e}"
-            self.after(0, self.update_status, error_message, True)
-            self.after(0, lambda: messagebox.showerror("API Error", f"Failed to fetch repositories.\nCheck your token and network connection.\n\n{e}"))
+            self.after(0, lambda *_: self.update_status(error_message, True))
+            self.after(0, lambda *_: messagebox.showerror("API Error", f"Failed to fetch repositories.\nCheck your token and network connection.\n\n{e}"))
 
     def _update_repo_selector(self):
         """Updates the repository dropdown on the main GUI thread."""
@@ -144,10 +150,10 @@ class GitHubReleaseManager(tk.Tk):
             response = requests.get(url, headers=headers, params={"per_page": 100})
             response.raise_for_status()
             self.releases = response.json()
-            self.after(0, self._populate_release_tree)
-            self.after(0, self.update_status, f"Loaded {len(self.releases)} releases for {repo_name}.")
+            self.after(0, lambda *_: self._populate_release_tree())
+            self.after(0, lambda *_: self.update_status(f"Loaded {len(self.releases)} releases for {repo_name}."))
         except requests.RequestException as e:
-            self.after(0, self.update_status, f"Error loading releases: {e}", True)
+            self.after(0, lambda *_: self.update_status(f"Error loading releases: {e}", True))
 
     def _populate_release_tree(self):
         """Clears and populates the treeview with release data on the main GUI thread."""
@@ -211,21 +217,21 @@ class GitHubReleaseManager(tk.Tk):
         """The background task to delete releases via API calls."""
         headers = {"Authorization": f"token {self.token.get()}"}
         repo_name = self.selected_repo.get()
-        success_count = 0
-        fail_count = 0
+        success_results: List[int] = []
+        fail_results: List[int] = []
 
         for release_id in release_ids:
             url = f"https://api.github.com/repos/{repo_name}/releases/{release_id}"
             try:
                 response = requests.delete(url, headers=headers)
                 response.raise_for_status()
-                success_count += 1
+                success_results.append(1)
             except requests.RequestException:
-                fail_count += 1
+                fail_results.append(1)
         
-        result_message = f"Deletion complete. Succeeded: {success_count}, Failed: {fail_count}."
-        self.after(0, self.update_status, result_message)
-        self.after(0, self.load_releases) # Refresh the list after deletion
+        result_message = f"Deletion complete. Succeeded: {len(success_results)}, Failed: {len(fail_results)}."
+        self.after(0, lambda *_: self.update_status(result_message))
+        self.after(0, lambda *_: self.load_releases()) # Refresh the list after deletion
 
 if __name__ == "__main__":
     app = GitHubReleaseManager()
