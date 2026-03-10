@@ -24,6 +24,7 @@ class GitHubReleaseManager(tk.Tk):
         # Initialize attributes for type checking (using Any to simplify external dependency issues in Pyre2)
         self.repo_selector: Any = None
         self.tree: Any = None
+        self.description_text: Any = None
         self.status_label: Any = None
 
         self._create_widgets()
@@ -52,12 +53,10 @@ class GitHubReleaseManager(tk.Tk):
         release_frame = ttk.LabelFrame(main_frame, text="Releases", padding="10")
         release_frame.pack(fill=tk.BOTH, expand=True)
 
-        cols = ("Select", "Tag Name", "Release Name", "Created At")
-        self.tree = ttk.Treeview(release_frame, columns=cols, show="headings")
+        cols = ("Tag Name", "Release Name", "Created At")
+        self.tree = ttk.Treeview(release_frame, columns=cols, show="headings", selectmode="extended")
         
         # Define headings and column properties
-        self.tree.heading("Select", text="Select")
-        self.tree.column("Select", width=60, anchor=tk.CENTER, stretch=False)
         self.tree.heading("Tag Name", text="Tag Name")
         self.tree.column("Tag Name", width=150)
         self.tree.heading("Release Name", text="Release Name")
@@ -71,8 +70,19 @@ class GitHubReleaseManager(tk.Tk):
         self.tree.configure(yscroll=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Bind click event to toggle checkbox simulation
-        self.tree.bind("<Button-1>", self.on_tree_click)
+        # --- Description Frame ---
+        description_frame = ttk.LabelFrame(main_frame, text="Release Description", padding="10")
+        description_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+
+        self.description_text = tk.Text(description_frame, height=8, wrap=tk.WORD, state=tk.DISABLED)
+        self.description_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        desc_scrollbar = ttk.Scrollbar(description_frame, orient=tk.VERTICAL, command=self.description_text.yview)
+        self.description_text.configure(yscroll=desc_scrollbar.set)
+        desc_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Bind events for double-click
+        self.tree.bind("<Double-1>", self.on_double_click)
 
         # --- Bottom Frame for Actions and Status ---
         bottom_frame = ttk.Frame(self, padding="10")
@@ -161,37 +171,39 @@ class GitHubReleaseManager(tk.Tk):
             self.tree.delete(i)
         
         for release in self.releases:
-            # Use Unicode characters to simulate checkboxes for a clean look
-            checkbox = "☐"
             self.tree.insert("", "end", iid=release['id'], values=(
-                checkbox,
                 release.get('tag_name', 'N/A'),
                 release.get('name', 'N/A'),
                 release.get('created_at', 'N/A').split('T')[0]
             ))
 
-    def on_tree_click(self, event):
-        """Handles clicks on the treeview to toggle the checkbox simulation."""
-        region = self.tree.identify("region", event.x, event.y)
-        if region != "cell":
+    def on_double_click(self, event):
+        """Updates the description pane when a row is double-clicked."""
+        item_id = self.tree.identify_row(event.y)
+        if not item_id:
             return
 
-        column_id = self.tree.identify_column(event.x)
-        if column_id == "#1": # Check if the click was on the "Select" column
-            row_id = self.tree.identify_row(event.y)
-            if not row_id:
-                return
+        release = next((r for r in self.releases if str(r['id']) == item_id), None)
+        if release:
+            description = release.get('body') or "No description provided."
+            self._update_description(description)
+
+    def _update_description(self, text):
+        """Helper to update the read-only description text widget."""
+        # Ensure text is a string to avoid TclErrors in some Tkinter versions
+        if text is None:
+            text = ""
+        else:
+            text = str(text)
             
-            current_values = self.tree.item(row_id, "values")
-            current_state = current_values[0]
-            new_state = "☑" if current_state == "☐" else "☐"
-            
-            # Update only the checkbox value
-            self.tree.item(row_id, values=(new_state,) + current_values[1:])
+        self.description_text.config(state=tk.NORMAL)
+        self.description_text.delete("1.0", tk.END)
+        self.description_text.insert(tk.END, text)
+        self.description_text.config(state=tk.DISABLED)
 
     def delete_selected_releases(self):
         """Identifies selected releases and asks for user confirmation before deletion."""
-        selected_items = [item for item in self.tree.get_children() if self.tree.item(item, "values")[0] == "☑"]
+        selected_items = self.tree.selection()
 
         if not selected_items:
             messagebox.showinfo("Info", "No releases selected for deletion.")
@@ -200,8 +212,8 @@ class GitHubReleaseManager(tk.Tk):
         release_details_to_delete = []
         for item_id in selected_items:
             values = self.tree.item(item_id, "values")
-            tag_name = values[1]
-            release_name = values[2]
+            tag_name = values[0]
+            release_name = values[1]
             release_details_to_delete.append(f"{release_name} ({tag_name})")
         
         confirm = messagebox.askyesno(
